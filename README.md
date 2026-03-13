@@ -1,6 +1,18 @@
-# Rastreador de Linhas de Ônibus do Rio
+# Relatório de Projeto: Rastreador de Linhas de Ônibus SPPO do Rio
+**Nome:** Nicholas Borges de Vasconcelos
 
-Aplicativo Streamlit que visualiza as posições em tempo real de qualquer linha SPPO do Rio de Janeiro. Os dados vêm da API oficial de mobilidade em https://dados.mobilidade.rio/gps/sppo. O app busca automaticamente um novo snapshot (em cache por 60 segundos), permite escolher uma linha a partir do conjunto retornado e exibe os resultados em um mapa colorido sincronizado com uma tabela.
+**Matricula:** 202407138829
+
+**Disciplina:** Extração e Preparação de Dados
+
+**Instituição:** Ibmec 
+
+## Intro
+
+Aplicativo Streamlit que visualiza as posições em tempo real de qualquer linha SPPO do Rio de Janeiro. Os dados vêm da API oficial de mobilidade em https://dados.mobilidade.rio/gps/sppo. O app busca automaticamente um novo snapshot (em cache por 60 segundos), permite escolher uma linha a partir do conjunto retornado e exibe os resultados em um mapa colorido sincronizado com uma tabela. Projeto para a disciplina Extração e Preparação de Dados (5º período de CDIA no Ibmec).
+
+## Acesso rápido
+- Use direto no Streamlit Cloud: https://onibus-rj-dados-tracker.streamlit.app/ (recomendado).
 
 ## Funcionalidades
 - Busca automática a cada execução com cache do Streamlit (`@st.cache_data`), reutilizando o mesmo snapshot da API em reexecuções dentro de 60 segundos.
@@ -22,26 +34,11 @@ README.md           # Este documento
 - Python 3.11+ (ZoneInfo exige Python 3.9+, mas o Streamlit se beneficia de versões mais novas)
 - Ferramenta de ambiente virtual de sua preferência (opcional, porém recomendada)
 
-## Instalação e Execução
-1. **Clone ou copie o projeto.**
-2. **Crie e ative um ambiente virtual (opcional, porém recomendado).**
-   ```bash
-   python -m venv .venv
-   # Windows PowerShell
-   .\.venv\Scripts\Activate.ps1
-   ```
-3. **Instale as dependências.**
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. **Inicie o app.**
-   ```bash
-   streamlit run app.py
-   ```
-5. **Interaja pelo navegador.**
-   - O Streamlit abre uma aba automaticamente; caso não aconteça, siga a URL local impressa (padrão http://localhost:8501).
-   - Escolha uma linha no dropdown (padrão `169` quando disponível) e, se quiser, filtre para um único ônibus.
-   - Explore o mapa (auto-centralizado nos ônibus ativos) e a tabela sincronizada. Para atualizar antes da janela de cache de 60 segundos, use o “Rerun” do Streamlit ou recarregue a aba do navegador.
+## Instalação para desenvolvimento
+- Clone o repositório e crie um ambiente virtual se quiser isolar dependências.
+- `pip install -r requirements.txt`
+- `streamlit run app.py`
+- Abra a URL local (tipicamente http://localhost:8501), escolha uma linha e filtre ônibus se necessário.
 
 ## Como Funciona
 1. `fetch_bus_positions()` busca dados da API sempre que o app é reexecutado e os coloca em cache por 60 segundos para reduzir carga.
