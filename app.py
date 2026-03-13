@@ -395,7 +395,7 @@ def main() -> None:
     selectable_buses = sorted(bus for bus in bus_df["ordem"].unique() if bus)
     show_all_label = "Todos os ônibus"
     bus_selection = st.sidebar.selectbox(
-        "Filtrar por ônibus (ordem)",
+        " Filtrar por ônibus (ordem)",
         [show_all_label, *selectable_buses],
     )
 
