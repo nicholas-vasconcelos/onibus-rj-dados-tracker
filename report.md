@@ -1,83 +1,56 @@
-# Rio Bus Line Tracker: Architecture & Data Workflow
+# Relatório de Projeto: Rastreador de Linhas de Ônibus SPPO do Rio
+**Nome:** Nicholas Borges de Vasconcelos
 
-## Overview
-The application is a Streamlit dashboard that visualizes real-time GPS data from Rio de Janeiro’s SPPO buses. It highlights core steps in a modern data pipeline: extraction from a public API, cleaning/normalization, filtering, and presentation through map and tabular views. Folium renders a geographic view, while pandas handles in-memory data shaping. All business logic lives in `app.py`, keeping the implementation lightweight but structured enough to be reused in a larger system (e.g., Django + React) later.
+**Matricula:** 202407138829
 
----
+**Disciplina:** Extração e Preparação de Dados
 
-## Data Extraction
-- **Source API**: `https://dados.mobilidade.rio/gps/sppo` returns a JSON array with bus telemetry (latitude, longitude, timestamps, line identifier, etc.).
-- **Fetcher**: `fetch_bus_positions()` performs a GET with `requests`, raises on HTTP errors, and validates that payloads are list-like. Streamlit’s `@st.cache_data(ttl=30)` decorator memoizes responses for 30 seconds to avoid spamming the provider and to keep the UI responsive.
-- **Schema expectations**: The function asserts the presence of `linha`, `latitude`, `longitude`, `ordem`, `velocidade`, and `datahora`. Early validation prevents downstream logic from failing silently and demonstrates best practices in data ingestion.
-- **Automatic refresh cadence**: Every Streamlit rerun (triggered by user interactions or manual reruns) pulls a new snapshot through the cached fetcher. Within the 30-second TTL, Streamlit serves the cached DataFrame instantly; once it expires, the next rerun renews the dataset. This mirrors reproducible batch-extraction workflows where fresh pulls feed downstream filters.
+**Instituição:** Ibmec 
 
-**Data-pipeline tie-in**: This stage mirrors a typical “extract” step, enforcing schema contracts and caching raw pulls for subsequent transformations.
+## 1. Visão Geral
 
----
+Este aplicativo rastreia ônibus municipais no Rio de Janeiro, demonstrando um pipeline de dados completo, desde a extração bruta da API até a visualização interativa em um painel Streamlit (publicado em https://onibus-rj-dados-tracker.streamlit.app/). A arquitetura se alinha às etapas fundamentais do processo de mineração de dados e foi desenvolvida para a disciplina de Extração e Preparação de Dados (5º período de CDIA no Ibmec).
 
-## Data Preparation & Cleaning
-### Coordinate normalization (`normalize_coordinate`)
-- Latitude/longitude arrive as strings that use commas for decimals (e.g., `"-22,90001"`). The helper replaces commas with periods and converts the result to `float`, returning `None` when parsing fails. This sanitization is crucial before handing coordinates to Folium’s numeric API.
+## 2. Etapa 1: Coleta e Limpeza 
 
-### Timestamp handling (`parse_timestamp`, `format_timestamp`)
-- `datahora` values represent milliseconds since epoch but are provided as strings (sometimes with commas). `parse_timestamp` coerces them to floats, builds timezone-aware `datetime` objects (`America/Sao_Paulo`), and returns `None` on invalid data.
-- `format_timestamp` applies a human-readable format for use in tooltips/table rows.
+Esta fase reúne e prepara os dados brutos para garantir a qualidade dos resultados nas etapas posteriores.
 
-### Main preparation (`prepare_bus_dataframe`)
-1. Optionally receives an already-fetched DataFrame to avoid redundant API calls (useful when Streamlit reruns multiple times within the cache window).
-2. Filters by the selected `linha` (line number) and strips whitespace.
-3. Cleans `ordem` identifiers, applies coordinate normalization, converts `velocidade` to numeric, and parses timestamps.
-4. Drops rows missing essential fields.
-5. Enforces a recency window (≤5 minutes) to reduce map clutter, ensuring the dataset reflects near-real-time conditions.
+* A função `fetch_bus_positions()` extrai dados em tempo real no formato JSON da API de mobilidade aberta do Rio, com cache de 60 segundos (`@st.cache_data`) e `requests` com timeout para estabilidade.
 
-Collectively, these steps illustrate the “transform” phase: type casting, missing-value handling, feature derivation (`timestamp_dt`, formatted labels), and domain-specific filtering.
+* Para limpar e validar os registros, o código verifica a presença de campos obrigatórios como `linha`, `ordem`, coordenadas e `datahora` antes de processar.
 
----
+* A função `normalize_coordinate` padroniza os dados, substituindo vírgulas decimais por pontos e convertendo-os para float, uniformizando formatos e estruturas.
 
-## UI Logic & Interactivity
--### Automatic snapshot cadence
-- The app fetches data automatically during each rerun. Because Streamlit reruns the script whenever widgets change (or when the user clicks “Rerun”/refreshes the page), users see near-real-time snapshots without needing any manual refresh control.
-- Cached responses from `@st.cache_data` keep repeated reruns within 30 seconds instantaneous and reduce API pressure, while still ensuring the dataset refreshes promptly when the TTL expires.
 
-### Line selection
-- Once data is available, a dropdown lists every unique `linha`. Default selection favors line `169` when present. This prevents typos and keeps the experience consistent with data-driven selection in enterprise dashboards.
 
-### Bus filtering 
-- A second dropdown lets the user focus on a specific `ordem` (vehicle). When “Show all buses” is selected, only the freshest point for each bus is displayed. When a single bus is chosen, the app reveals its last ten observations, using progressively lighter colors to visualize its recent path.
+## 3. Etapa 2: Transformação 
 
-### Color encoding
-- `assign_bus_colors` guarantees deterministic marker colors per bus. The hex value is shown in the table, keeping the map and grid in sync. `text_color_for_hex` and `style_color_column` ensure accessibility by selecting a complementary font color.
+Aqui, os dados limpos são convertidos e normalizados em formatos adequados para análise.
 
-### Map rendering (`build_map`)
-- The map centers on the mean latitude/longitude of the displayed subset and then calls `fit_bounds` where possible to zoom around the actual coverage area. 
-- Current positions use Folium’s bus icon with the assigned marker color. Historical points render as circle markers with lighter shades (via `lighten_hex`), giving a sparkline-like path overlay without overwhelming the UI.
+* A função `parse_timestamp` converte milissegundos em objetos `datetime` com fuso horário, preparando valores para ordenação e exibição.
 
-**Data-prep link:** The visualization layer depends entirely on the curated DataFrame; by the time Folium runs, coordinates are floats, timestamps are formatted strings, and style metadata is attached. This separation mirrors dashboards built atop prepared datasets or feature tables.
+* A função `prepare_bus_dataframe` remove linhas incompletas, filtra pela linha escolhida via sidebar e normaliza colunas críticas (coordenadas, velocidade e timestamp formatado para o usuário).
 
-### Tabular output
-- A pandas `DataFrame` provides complementary detail (Bus ID, last update, speed, coordinates, color swatch). Styling the color column via `DataFrame.style` carries the same palette as the map, demonstrating consistent downstream consumption of prepared data.
+* O código aplica uma janela de recência de 5 minutos para descartar pontos de GPS desatualizados, mantendo o painel leve e focado.
 
----
 
-## Key Design Decisions
-1. **Cached auto-refresh workflow**: Streamlit reruns trigger fresh fetches, but the cache keeps repeated interactions within 30 seconds instantaneous. This balances responsiveness with considerate API usage and mirrors controlled batch-ingestion cycles.
-2. **Short recency window (5 minutes)**: Improves performance, avoids outdated markers, and acts as an implicit temporal filter—a common data-preparation practice.
-3. **Reusable prep functions**: `prepare_bus_dataframe`, coordinate/timestamp utilities, and color helpers can be lifted into another backend, emphasizing modular extraction/prep logic separate from the UI shell.
-4. **Fallback-safe rendering**: Every user-facing step checks for empty datasets, malformed API responses, or missing filter results, preventing crashes and ensuring the pipeline either produces useful data or surfaces actionable errors.
 
----
+## 4. Etapa 3: Mineração 
 
-## Relation to Data Extraction & Preparation Coursework
-- **Extraction**: Demonstrates connecting to an external source, validating schema, and caching raw pulls.
-- **Cleaning/Preparation**: Includes coordinate normalization, timestamp parsing, type coercion, filtering, and feature engineering—all core topics in data preprocessing.
-- **Exploratory visualization**: Shows how cleaned data feeds map + tabular outputs, enabling real-time exploratory analysis for stakeholders.
-- **Extensibility**: The logical separation makes it straightforward to swap the Streamlit UI with a React frontend or to schedule the fetch/clean steps in an ETL job, bridging classroom exercises with production-ready patterns.
+Esta etapa envolve a aplicação de algoritmos e técnicas específicas para descobrir padrões nos dados preparados.
 
----
+* O aplicativo destaca padrões ao permitir filtrar um ônibus específico e exibir suas últimas localizações (até 10 pontos) com cores progressivamente mais claras para evidenciar trajetória.
 
-## Possible Extensions
-- Persist historical snapshots (e.g., to a database) for trend analysis beyond the five-minute window.
-- Introduce anomaly detection (speed spikes, GPS jumps) using the same prep pipeline but adding validation rules.
-- Expose the prepared DataFrame via an API to decouple the visualization layer entirely.
+* O pipeline estrutura o DataFrame para suportar futuras aplicações preditivas, como estimativa de chegada e análises de frequência de passagem.
 
-These enhancements would deepen the data-engineering narrative by layering additional extraction, transformation, and loading steps on the existing foundation.
+* Esses dados estruturados também podem ser aplicados à logística para otimização de rotas e balanceamento de frota por linha.
+
+
+
+## 5. Etapa 4: Avaliação 
+
+A fase final valida os resultados obtidos para garantir sua utilidade prática.
+
+* O aplicativo combina um mapa Folium (com ajuste automático de bounds e marcadores coloridos por ônibus) com um DataFrame estilizado, facilitando a leitura de padrões espaço-temporais.
+
+* O `@st.cache_data` do Streamlit e o fluxo de recarga manual reduzem a carga da API, permitindo experimentação rápida sem perder estabilidade.
